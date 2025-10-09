@@ -1,0 +1,7 @@
+inventory_host: "<INVENTORY_HOST>"
+working_dir: "/opt/tests"
+results_dir: "raw-results"
+allure_url: "http://<ALLURE_VM_HOST>:5050"
+project_id: "example-project"
+force_project_creation: true
+generate_report: true

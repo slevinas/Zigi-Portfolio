@@ -1,0 +1,13 @@
+- hosts: localhost
+  gather_facts: false
+  vars:
+    config_path: "{{ config_path | default('./.ci/infra/infra.compose.template.yml') }}"
+  tasks:
+    - name: Read infra spec YAML
+      include_vars:
+        file: "{{ config_path }}"
+        name: cfg
+    - name: Write infra_config JSON for workflow
+      copy:
+        content: "{{ cfg | to_json }}"
+        dest: "infra_config.json"

@@ -1,0 +1,61 @@
+name: Push Results to Allure (Template)
+on:
+  workflow_call:
+    inputs:
+      inputs_path:
+        description: "Path to inputs-push-results.yml"
+        type: string
+        required: true
+    secrets:
+      ssh-key:
+        required: true
+
+jobs:
+  load:
+    name: Load inputs file
+    runs-on: ubuntu-latest
+    outputs:
+      push_inputs: ${{ steps.out.outputs.push_inputs }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load inputs via Ansible (local)
+        run: |
+          ansible-playbook -i localhost, -c local \
+            ./.ansible/playbooks/load_pytest_spec.yml \
+            --extra-vars "spec_path=${{ github.workspace }}/${{ inputs.inputs_path }}"
+          mv pytest_config.json push_inputs.json
+      - id: out
+        name: Export push_inputs JSON
+        shell: bash
+        run: |
+          echo "push_inputs=$(cat push_inputs.json)" >> "$GITHUB_OUTPUT"
+
+  push-results-to-allure:
+    name: Publish to Allure
+    needs: load
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Build vars.json
+        run: |
+          cat > vars.json <<'JSON'
+          {
+            "inventory_host": "${{ fromJSON(needs.load.outputs.push_inputs).inventory_host }}",
+            "working_dir":   "${{ fromJSON(needs.load.outputs.push_inputs).working_dir }}",
+            "results_dir":   "${{ fromJSON(needs.load.outputs.push_inputs).results_dir }}",
+            "allure_url":    "${{ fromJSON(needs.load.outputs.push_inputs).allure_url }}",
+            "project_id":    "${{ fromJSON(needs.load.outputs.push_inputs).project_id }}",
+            "force_project_creation": ${{ fromJSON(needs.load.outputs.push_inputs).force_project_creation }},
+            "generate_report": ${{ fromJSON(needs.load.outputs.push_inputs).generate_report }}
+          }
+          JSON
+      - name: Push via Ansible
+        run: |
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "$(jq -r .inventory_host vars.json)" \
+            ./.ansible/playbooks/push_allure_results.yml \
+            --extra-vars "@vars.json"

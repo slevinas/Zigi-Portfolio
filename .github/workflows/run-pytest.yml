@@ -1,0 +1,67 @@
+name: Run Pytest (Template)
+on:
+    workflow_call:
+        inputs:
+            spec_path:
+                description: "Path to pytest spec YAML"
+                type: string
+                required: true
+        secrets:
+            ssh-key:
+                required: true
+            TESTER_ENV_FILE_CONTENTS:
+                required: true
+
+jobs:
+    load:
+        name: Load pytest spec
+        runs-on: ubuntu-latest
+        outputs:
+            pytest_config: ${{ steps.out.outputs.pytest_config }}
+        steps:
+            - uses: actions/checkout@v4
+            - name: Load spec via Ansible (local)
+              run: |
+                  ansible-playbook -i localhost, -c local \
+                    ./.ansible/playbooks/load_pytest_spec.yml \
+                    --extra-vars "spec_path=${{ github.workspace }}/${{ inputs.spec_path }}"
+            - id: out
+              name: Export pytest_config JSON
+              shell: bash
+              run: |
+                  echo "pytest_config=$(cat pytest_config.json)" >> "$GITHUB_OUTPUT"
+
+    run:
+        name: Execute pytest on remote
+        needs: load
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Start SSH Agent
+              uses: webfactory/ssh-agent@v0.8.0
+              with:
+                  ssh-private-key: ${{ secrets.ssh-key }}
+            - name: Run pytest via Ansible
+              env:
+                  PYTEST_CONFIG: ${{ needs.load.outputs.pytest_config }}
+                  TESTER_ENV_FILE_CONTENTS: ${{ secrets.TESTER_ENV_FILE_CONTENTS }}
+              shell: bash
+              run: |
+                  printf '%s' "$PYTEST_CONFIG" > pytest_config.json
+                  python - <<'PY'
+                    import json
+                    cfg=json.load(open('pytest_config.json'))
+                    open('pytest_vars.json','w').write(json.dumps({
+                    'pytest_config': cfg,
+                    'env_file_contents': "${{ secrets.TESTER_ENV_FILE_CONTENTS }}"
+                    }))
+                    PY
+                  ansible-playbook -i ./.ansible/inventory/hosts.ini \
+                    --limit "$(jq -r .inventory_host < pytest_config.json)" \
+                    ./.ansible/playbooks/run_pytest.yml \
+                    --extra-vars "@pytest_vars.json"
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: raw-results
+                  path: raw-results-*.tgz
+                  if-no-files-found: error

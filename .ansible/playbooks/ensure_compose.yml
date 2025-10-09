@@ -1,0 +1,11 @@
+- hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    setup_path: ""
+  tasks:
+    - name: Ensure docker compose up -d
+      shell: |
+        set -euo pipefail
+        cd "{{ setup_path }}"
+        docker compose up -d

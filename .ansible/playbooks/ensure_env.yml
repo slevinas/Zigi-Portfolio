@@ -1,0 +1,20 @@
+- hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    ensure_python: false
+    ensure_docker: false
+  tasks:
+    - name: Ensure Python packages (Debian/Ubuntu)
+      apt:
+        name: [python3, python3-venv, python3-pip]
+        state: present
+        update_cache: true
+      when: ensure_python | bool
+
+    - name: Install Docker (script convenience)  # use hardened method in prod
+      shell: |
+        curl -fsSL https://get.docker.com | sh
+      args:
+        warn: false
+      when: ensure_docker | bool

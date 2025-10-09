@@ -1,0 +1,34 @@
+- hosts: all
+  gather_facts: false
+  vars:
+    working_dir: ""
+    results_dir: "raw-results"
+    allure_url: ""
+    project_id: ""
+    force_project_creation: false
+    generate_report: true
+  tasks:
+    - name: Zip results directory
+      shell: |
+        set -e
+        cd "{{ working_dir }}"
+        tar -czf /tmp/allure-results.tar.gz "{{ results_dir }}"
+    - name: Create project (optional)
+      uri:
+        url: "{{ allure_url }}/allure-docker-service/create-project?project_id={{ project_id }}"
+        method: POST
+        status_code: 200,409
+      when: force_project_creation | bool
+    - name: Send results
+      uri:
+        url: "{{ allure_url }}/allure-docker-service/send-results?project_id={{ project_id }}"
+        method: POST
+        body_format: form-multipart
+        body:
+          files[]: "@/tmp/allure-results.tar.gz"
+      register: send_resp
+    - name: Generate report (optional)
+      uri:
+        url: "{{ allure_url }}/allure-docker-service/generate-report?project_id={{ project_id }}"
+        method: GET
+      when: generate_report | bool

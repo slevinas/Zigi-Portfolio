@@ -1,0 +1,14 @@
+version: 2
+inventory_host: "<INVENTORY_HOST>"
+ensure:
+  python: true
+  docker: true
+  directories:
+    - "/var/tmp/test-results"
+  files:
+    - src: ".ci/payloads/synthetic_flux_source.log"
+      dest: "/var/tmp/synthetic_flux_source.log"
+compose_setup_path: ".ci/compose/setup"
+has_compose_setup: true
+any_clone: false
+clone_specs: []

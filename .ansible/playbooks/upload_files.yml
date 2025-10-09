@@ -1,0 +1,18 @@
+- hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    files_json: []
+  tasks:
+    - name: Ensure destination dirs exist
+      file:
+        path: "{{ item.dest | dirname }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ files_json }}"
+    - name: Upload files from repo to remote
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "0644"
+      loop: "{{ files_json }}"

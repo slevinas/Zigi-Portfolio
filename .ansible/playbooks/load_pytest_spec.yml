@@ -1,0 +1,13 @@
+- hosts: localhost
+  gather_facts: false
+  vars:
+    spec_path: "{{ spec_path | default('./.ci/pytest/pytest.template.yml') }}"
+  tasks:
+    - name: Read spec YAML
+      include_vars:
+        file: "{{ spec_path }}"
+        name: spec
+    - name: Write JSON for workflow
+      copy:
+        content: "{{ spec | to_json }}"
+        dest: "pytest_config.json"

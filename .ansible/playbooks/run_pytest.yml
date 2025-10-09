@@ -1,0 +1,43 @@
+- hosts: all
+  become: false
+  gather_facts: false
+  vars:
+    pytest_config: {}
+    env_file_contents: ""
+  tasks:
+    - name: Extract config vars
+      set_fact:
+        wd: "{{ pytest_config.working_dir }}"
+        venv: "{{ pytest_config.pytest.venv_path }}"
+        cmd: "{{ pytest_config.pytest.test_command }}"
+        out_tgz: "{{ pytest_config.artifacts.output_tgz | default('raw-results-template.tgz') }}"
+    - name: Prepare working dir
+      file:
+        path: "{{ wd }}"
+        state: directory
+        mode: "0755"
+    - name: Create .env for tests (if provided)
+      copy:
+        content: "{{ env_file_contents }}"
+        dest: "{{ wd }}/.env"
+      when: env_file_contents | length > 0
+    - name: Ensure venv and pytest
+      shell: |
+        set -e
+        python3 -m venv "{{ venv }}"
+        "{{ venv }}/bin/pip" install -U pip pytest
+      args: { chdir: "{{ wd }}" }
+    - name: Run tests
+      shell: |
+        set -e
+        . "{{ venv }}/bin/activate"
+        mkdir -p raw-results
+        {{ cmd }}
+        echo "sample" > raw-results/sample.txt
+      args: { chdir: "{{ wd }}" }
+    - name: Tar raw-results for upload
+      shell: |
+        set -e
+        cd "{{ wd }}"
+        tar -czf "{{ out_tgz }}" raw-results
+        cp "{{ out_tgz }}" "{{ lookup('env','GITHUB_WORKSPACE') | default('.') }}/"

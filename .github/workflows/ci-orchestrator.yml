@@ -1,0 +1,29 @@
+name: CI Orchestrator — Ensure → Test → Publish
+on:
+  push:
+    branches: [ ci/spec-driven-template ]
+
+jobs:
+  ensure-infra-compose:
+    uses: ./.github/workflows/ensure-infra-compose.yml
+    with:
+      infra_path: ./.ci/infra/infra.compose.template.yml
+    secrets:
+      ssh-key: ${{ secrets.TESTER_SSH_KEY }}
+
+  run-pytest:
+    needs: ensure-infra-compose
+    uses: ./.github/workflows/run-pytest.yml
+    with:
+      spec_path: ./.ci/pytest/pytest.template.yml
+    secrets:
+      ssh-key: ${{ secrets.TESTER_SSH_KEY }}
+      TESTER_ENV_FILE_CONTENTS: ${{ secrets.TESTER_ENV_FILE_CONTENTS }}
+
+  upload-results-to-allure:
+    needs: run-pytest
+    uses: ./.github/workflows/push-results-to-allure.yml
+    with:
+      inputs_path: ./.ci/allure/inputs-push-results.yml
+    secrets:
+      ssh-key: ${{ secrets.TESTER_SSH_KEY }}

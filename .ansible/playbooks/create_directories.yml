@@ -1,0 +1,15 @@
+- hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    _dirs: []
+  tasks:
+    - name: Load directories JSON from extra-vars
+      set_fact:
+        _dirs: "{{ _dirs if _dirs else (directories_json | default([])) }}"
+    - name: Create directories idempotently
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ _dirs }}"

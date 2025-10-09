@@ -1,0 +1,7 @@
+inventory_host: "<INVENTORY_HOST>"
+working_dir: "/opt/tests"
+pytest:
+  venv_path: "/opt/venv"
+  test_command: "pytest -q tests/test_smoke.py"
+artifacts:
+  output_tgz: "raw-results-template.tgz"

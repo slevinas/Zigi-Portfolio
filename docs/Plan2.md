@@ -177,3 +177,637 @@ If you’d like, I can regenerate your PDF with the tiny wording fix + ordering 
 ----
 
 
+# Spec-Driven CI + Ansible — Public Repo Scaffold
+
+Copy these files into a new GitHub repository (public/redacted). All secrets remain in **GitHub Secrets**. Replace placeholders like `<INVENTORY_HOST>` and `<ALLURE_VM_HOST>`.
+
+---
+
+## Repository tree
+
+```
+spec-driven-ci-ansible-template/
+├── .github/
+│   └── workflows/
+│       ├── ci-orchestrator.yml
+│       ├── ensure-infra-compose.yml
+│       ├── run-pytest.yml
+│       └── push-results-to-allure.yml
+├── .ansible/
+│   ├── inventory/
+│   │   └── hosts.ini
+│   └── playbooks/
+│       ├── load_infra_spec.yml
+│       ├── load_pytest_spec.yml
+│       ├── ensure_env.yml
+│       ├── create_directories.yml
+│       ├── upload_files.yml
+│       ├── ensure_compose.yml
+│       ├── run_pytest.yml
+│       └── push_allure_results.yml
+├── .ci/
+│   ├── infra/infra.compose.template.yml
+│   ├── pytest/pytest.template.yml
+│   └── allure/inputs-push-results.yml
+├── docs/
+│   └── allure-server-setup.md
+├── .gitignore
+├── LICENSE
+└── README.md
+
+
+```
+
+---
+
+## `.github/workflows/ci-orchestrator.yml`
+
+```yaml
+name: CI Orchestrator — Ensure → Test → Publish
+on:
+  push:
+    branches: [ ci/spec-driven-template ]
+
+jobs:
+  ensure-infra-compose:
+    uses: ./.github/workflows/ensure-infra-compose.yml
+    with:
+      infra_path: ./.ci/infra/infra.compose.template.yml
+    secrets:
+      ssh-key: ${{ secrets.TESTER_SSH_KEY }}
+
+  run-pytest:
+    needs: ensure-infra-compose
+    uses: ./.github/workflows/run-pytest.yml
+    with:
+      spec_path: ./.ci/pytest/pytest.template.yml
+    secrets:
+      ssh-key: ${{ secrets.TESTER_SSH_KEY }}
+      TESTER_ENV_FILE_CONTENTS: ${{ secrets.TESTER_ENV_FILE_CONTENTS }}
+
+  upload-results-to-allure:
+    needs: run-pytest
+    uses: ./.github/workflows/push-results-to-allure.yml
+    with:
+      inputs_path: ./.ci/allure/inputs-push-results.yml
+    secrets:
+      ssh-key: ${{ secrets.TESTER_SSH_KEY }}
+```
+
+## `.github/workflows/ensure-infra-compose.yml`
+
+```yaml
+name: Ensure Infra + Compose (Template)
+on:
+  workflow_call:
+    inputs:
+      infra_path:
+        description: "Path to unified infra spec (v2) in this repo"
+        type: string
+        required: true
+    secrets:
+      ssh-key:
+        required: true
+
+jobs:
+  load:
+    name: Load & normalize infra spec (v2)
+    runs-on: ubuntu-latest
+    outputs:
+      infra_config: ${{ steps.out.outputs.infra_config }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load spec via Ansible (local)
+        run: |
+          ansible-playbook -i localhost, -c local \
+            ./.ansible/playbooks/load_infra_spec.yml \
+            --extra-vars "config_path=${{ github.workspace }}/${{ inputs.infra_path }}"
+      - id: out
+        name: Export infra_config JSON
+        shell: bash
+        run: |
+          echo "infra_config=$(cat infra_config.json)" >> "$GITHUB_OUTPUT"
+
+  install-python:
+    name: Install Python (if requested)
+    needs: load
+    if: ${{ fromJSON(needs.load.outputs.infra_config).ensure.python == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Ensure Python on remote
+        run: |
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+            ./.ansible/playbooks/ensure_env.yml \
+            --extra-vars '{"ensure_python": true, "ensure_docker": false}'
+
+  install-docker:
+    name: Install Docker (if requested)
+    needs: [load, install-python]
+    if: ${{ fromJSON(needs.load.outputs.infra_config).ensure.docker == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Ensure Docker on remote
+        run: |
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+            ./.ansible/playbooks/ensure_env.yml \
+            --extra-vars '{"ensure_python": false, "ensure_docker": true}'
+
+  create-directories:
+    name: Create directories (if provided)
+    needs: load
+    if: ${{ fromJSON(needs.load.outputs.infra_config).ensure.directories && fromJSON(needs.load.outputs.infra_config).ensure.directories != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Create directories
+        run: |
+          python - <<'PY'
+import json
+j='''${{ toJSON(fromJSON(needs.load.outputs.infra_config).ensure.directories) }}'''
+open('directories.json','w').write(j)
+PY
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+            ./.ansible/playbooks/create_directories.yml \
+            --extra-vars "@directories.json"
+
+  upload-files:
+    name: Upload files (if provided)
+    needs: [load, create-directories]
+    if: ${{ fromJSON(needs.load.outputs.infra_config).ensure.files && fromJSON(needs.load.outputs.infra_config).ensure.files != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Upload files to remote
+        run: |
+          python - <<'PY'
+import json
+j='''${{ toJSON(fromJSON(needs.load.outputs.infra_config).ensure.files) }}'''
+open('files.json','w').write(j)
+PY
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+            ./.ansible/playbooks/upload_files.yml \
+            --extra-vars "@files.json"
+
+  ensure-compose:
+    name: Ensure Compose stacks (if compose_setup_path provided)
+    needs: [load, install-docker, upload-files]
+    if: ${{ fromJSON(needs.load.outputs.infra_config).has_compose_setup }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Ensure Compose
+        run: |
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+            ./.ansible/playbooks/ensure_compose.yml \
+            --extra-vars "setup_path=${{ fromJSON(needs.load.outputs.infra_config).compose_setup_path }}"
+```
+
+## `.github/workflows/run-pytest.yml`
+
+```yaml
+name: Run Pytest (Template)
+on:
+  workflow_call:
+    inputs:
+      spec_path:
+        description: "Path to pytest spec YAML"
+        type: string
+        required: true
+    secrets:
+      ssh-key:
+        required: true
+      TESTER_ENV_FILE_CONTENTS:
+        required: true
+
+jobs:
+  load:
+    name: Load pytest spec
+    runs-on: ubuntu-latest
+    outputs:
+      pytest_config: ${{ steps.out.outputs.pytest_config }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load spec via Ansible (local)
+        run: |
+          ansible-playbook -i localhost, -c local \
+            ./.ansible/playbooks/load_pytest_spec.yml \
+            --extra-vars "spec_path=${{ github.workspace }}/${{ inputs.spec_path }}"
+      - id: out
+        name: Export pytest_config JSON
+        shell: bash
+        run: |
+          echo "pytest_config=$(cat pytest_config.json)" >> "$GITHUB_OUTPUT"
+
+  run:
+    name: Execute pytest on remote
+    needs: load
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Run pytest via Ansible
+        env:
+          PYTEST_CONFIG: ${{ needs.load.outputs.pytest_config }}
+          TESTER_ENV_FILE_CONTENTS: ${{ secrets.TESTER_ENV_FILE_CONTENTS }}
+        shell: bash
+        run: |
+          printf '%s' "$PYTEST_CONFIG" > pytest_config.json
+          python - <<'PY'
+import json
+cfg=json.load(open('pytest_config.json'))
+open('pytest_vars.json','w').write(json.dumps({
+  'pytest_config': cfg,
+  'env_file_contents': "${{ secrets.TESTER_ENV_FILE_CONTENTS }}"
+}))
+PY
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "$(jq -r .inventory_host < pytest_config.json)" \
+            ./.ansible/playbooks/run_pytest.yml \
+            --extra-vars "@pytest_vars.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raw-results
+          path: raw-results-*.tgz
+          if-no-files-found: error
+```
+
+## `.github/workflows/push-results-to-allure.yml`
+
+```yaml
+name: Push Results to Allure (Template)
+on:
+  workflow_call:
+    inputs:
+      inputs_path:
+        description: "Path to inputs-push-results.yml"
+        type: string
+        required: true
+    secrets:
+      ssh-key:
+        required: true
+
+jobs:
+  load:
+    name: Load inputs file
+    runs-on: ubuntu-latest
+    outputs:
+      push_inputs: ${{ steps.out.outputs.push_inputs }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load inputs via Ansible (local)
+        run: |
+          ansible-playbook -i localhost, -c local \
+            ./.ansible/playbooks/load_pytest_spec.yml \
+            --extra-vars "spec_path=${{ github.workspace }}/${{ inputs.inputs_path }}"
+          mv pytest_config.json push_inputs.json
+      - id: out
+        name: Export push_inputs JSON
+        shell: bash
+        run: |
+          echo "push_inputs=$(cat push_inputs.json)" >> "$GITHUB_OUTPUT"
+
+  push-results-to-allure:
+    name: Publish to Allure
+    needs: load
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Build vars.json
+        run: |
+          cat > vars.json <<'JSON'
+          {
+            "inventory_host": "${{ fromJSON(needs.load.outputs.push_inputs).inventory_host }}",
+            "working_dir":   "${{ fromJSON(needs.load.outputs.push_inputs).working_dir }}",
+            "results_dir":   "${{ fromJSON(needs.load.outputs.push_inputs).results_dir }}",
+            "allure_url":    "${{ fromJSON(needs.load.outputs.push_inputs).allure_url }}",
+            "project_id":    "${{ fromJSON(needs.load.outputs.push_inputs).project_id }}",
+            "force_project_creation": ${{ fromJSON(needs.load.outputs.push_inputs).force_project_creation }},
+            "generate_report": ${{ fromJSON(needs.load.outputs.push_inputs).generate_report }}
+          }
+          JSON
+      - name: Push via Ansible
+        run: |
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "$(jq -r .inventory_host vars.json)" \
+            ./.ansible/playbooks/push_allure_results.yml \
+            --extra-vars "@vars.json"
+```
+
+---
+
+## Ansible playbooks (stubs)
+
+### `.ansible/playbooks/load_infra_spec.yml`
+
+```yaml
+- hosts: localhost
+  gather_facts: false
+  vars:
+    config_path: "{{ config_path | default('./.ci/infra/infra.compose.template.yml') }}"
+  tasks:
+    - name: Read infra spec YAML
+      include_vars:
+        file: "{{ config_path }}"
+        name: cfg
+    - name: Write infra_config JSON for workflow
+      copy:
+        content: "{{ cfg | to_json }}"
+        dest: "infra_config.json"
+```
+
+### `.ansible/playbooks/load_pytest_spec.yml`
+
+```yaml
+- hosts: localhost
+  gather_facts: false
+  vars:
+    spec_path: "{{ spec_path | default('./.ci/pytest/pytest.template.yml') }}"
+  tasks:
+    - name: Read spec YAML
+      include_vars:
+        file: "{{ spec_path }}"
+        name: spec
+    - name: Write JSON for workflow
+      copy:
+        content: "{{ spec | to_json }}"
+        dest: "pytest_config.json"
+```
+
+### `.ansible/playbooks/ensure_env.yml`
+
+```yaml
+- hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    ensure_python: false
+    ensure_docker: false
+  tasks:
+    - name: Ensure Python packages (Debian/Ubuntu)
+      apt:
+        name: [python3, python3-venv, python3-pip]
+        state: present
+        update_cache: true
+      when: ensure_python | bool
+
+    - name: Install Docker (script convenience)  # use hardened method in prod
+      shell: |
+        curl -fsSL https://get.docker.com | sh
+      args:
+        warn: false
+      when: ensure_docker | bool
+```
+
+### `.ansible/playbooks/create_directories.yml`
+
+```yaml
+- hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    _dirs: []
+  tasks:
+    - name: Load directories JSON from extra-vars
+      set_fact:
+        _dirs: "{{ _dirs if _dirs else (directories_json | default([])) }}"
+    - name: Create directories idempotently
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ _dirs }}"
+```
+
+### `.ansible/playbooks/upload_files.yml`
+
+```yaml
+- hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    files_json: []
+  tasks:
+    - name: Ensure destination dirs exist
+      file:
+        path: "{{ item.dest | dirname }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ files_json }}"
+    - name: Upload files from repo to remote
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "0644"
+      loop: "{{ files_json }}"
+```
+
+### `.ansible/playbooks/ensure_compose.yml`
+
+```yaml
+- hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    setup_path: ""
+  tasks:
+    - name: Ensure docker compose up -d
+      shell: |
+        set -euo pipefail
+        cd "{{ setup_path }}"
+        docker compose up -d
+```
+
+### `.ansible/playbooks/run_pytest.yml`
+
+```yaml
+- hosts: all
+  become: false
+  gather_facts: false
+  vars:
+    pytest_config: {}
+    env_file_contents: ""
+  tasks:
+    - name: Extract config vars
+      set_fact:
+        wd: "{{ pytest_config.working_dir }}"
+        venv: "{{ pytest_config.pytest.venv_path }}"
+        cmd: "{{ pytest_config.pytest.test_command }}"
+        out_tgz: "{{ pytest_config.artifacts.output_tgz | default('raw-results-template.tgz') }}"
+    - name: Prepare working dir
+      file:
+        path: "{{ wd }}"
+        state: directory
+        mode: "0755"
+    - name: Create .env for tests (if provided)
+      copy:
+        content: "{{ env_file_contents }}"
+        dest: "{{ wd }}/.env"
+      when: env_file_contents | length > 0
+    - name: Ensure venv and pytest
+      shell: |
+        set -e
+        python3 -m venv "{{ venv }}"
+        "{{ venv }}/bin/pip" install -U pip pytest
+      args: { chdir: "{{ wd }}" }
+    - name: Run tests
+      shell: |
+        set -e
+        . "{{ venv }}/bin/activate"
+        mkdir -p raw-results
+        {{ cmd }}
+        echo "sample" > raw-results/sample.txt
+      args: { chdir: "{{ wd }}" }
+    - name: Tar raw-results for upload
+      shell: |
+        set -e
+        cd "{{ wd }}"
+        tar -czf "{{ out_tgz }}" raw-results
+        cp "{{ out_tgz }}" "{{ lookup('env','GITHUB_WORKSPACE') | default('.') }}/"
+```
+
+### `.ansible/playbooks/push_allure_results.yml`
+
+```yaml
+- hosts: all
+  gather_facts: false
+  vars:
+    working_dir: ""
+    results_dir: "raw-results"
+    allure_url: ""
+    project_id: ""
+    force_project_creation: false
+    generate_report: true
+  tasks:
+    - name: Zip results directory
+      shell: |
+        set -e
+        cd "{{ working_dir }}"
+        tar -czf /tmp/allure-results.tar.gz "{{ results_dir }}"
+    - name: Create project (optional)
+      uri:
+        url: "{{ allure_url }}/allure-docker-service/create-project?project_id={{ project_id }}"
+        method: POST
+        status_code: 200,409
+      when: force_project_creation | bool
+    - name: Send results
+      uri:
+        url: "{{ allure_url }}/allure-docker-service/send-results?project_id={{ project_id }}"
+        method: POST
+        body_format: form-multipart
+        body:
+          files[]: "@/tmp/allure-results.tar.gz"
+      register: send_resp
+    - name: Generate report (optional)
+      uri:
+        url: "{{ allure_url }}/allure-docker-service/generate-report?project_id={{ project_id }}"
+        method: GET
+      when: generate_report | bool
+```
+
+---
+
+## Specs & docs
+
+### `.ansible/inventory/hosts.ini`
+
+```ini
+# DO NOT COMMIT REAL HOSTS/IPs IN PUBLIC REPOS
+[tester]
+<INVENTORY_HOST> ansible_user=<SSH_USER>
+```
+
+### `.ci/infra/infra.compose.template.yml`
+
+```yaml
+version: 2
+inventory_host: "<INVENTORY_HOST>"
+ensure:
+  python: true
+  docker: true
+  directories:
+    - "/var/tmp/test-results"
+  files:
+    - src: ".ci/payloads/synthetic_flux_source.log"
+      dest: "/var/tmp/synthetic_flux_source.log"
+compose_setup_path: ".ci/compose/setup"
+has_compose_setup: true
+any_clone: false
+clone_specs: []
+```
+
+### `.ci/pytest/pytest.template.yml`
+
+```yaml
+inventory_host: "<INVENTORY_HOST>"
+working_dir: "/opt/tests"
+pytest:
+  venv_path: "/opt/venv"
+  test_command: "pytest -q tests/test_smoke.py"
+artifacts:
+  output_tgz: "raw-results-template.tgz"
+```
+
+### `.ci/allure/inputs-push-results.yml`
+
+```yaml
+inventory_host: "<INVENTORY_HOST>"
+working_dir: "/opt/tests"
+results_dir: "raw-results"
+allure_url: "http://<ALLURE_VM_HOST>:5050"
+project_id: "example-project"
+force_project_creation: true
+generate_report: true
+```
+
+### `docs/allure-server-setup.md`
+
+```md
+(Host Allure on a separate VM using allure-docker-service; sample docker-compose; API endpoints; security notes.)
+```
+
+---
+
+## What to change before making the repo public
+
+* Replace host/IP with placeholders and keep inventory private.
+* Keep secrets in GitHub Secrets only (SSH, `.env`, tokens).
+* Remove any logs/artifacts that might contain sensitive data.
+* Optional: add a small `tests/test_smoke.py` to demo pytest.
+
+---
+
+If you want, I can also add a minimal `tests/test_smoke.py`, a small `compose` folder, and a `Makefile` with helper targets (`bootstrap`, `run`, `publish`).

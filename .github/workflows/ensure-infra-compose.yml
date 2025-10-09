@@ -1,0 +1,130 @@
+name: Ensure Infra + Compose (Template)
+on:
+  workflow_call:
+    inputs:
+      infra_path:
+        description: "Path to unified infra spec (v2) in this repo"
+        type: string
+        required: true
+    secrets:
+      ssh-key:
+        required: true
+
+jobs:
+  load:
+    name: Load & normalize infra spec (v2)
+    runs-on: ubuntu-latest
+    outputs:
+      infra_config: ${{ steps.out.outputs.infra_config }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load spec via Ansible (local)
+        run: |
+          ansible-playbook -i localhost, -c local \
+            ./.ansible/playbooks/load_infra_spec.yml \
+            --extra-vars "config_path=${{ github.workspace }}/${{ inputs.infra_path }}"
+      - id: out
+        name: Export infra_config JSON
+        shell: bash
+        run: |
+          echo "infra_config=$(cat infra_config.json)" >> "$GITHUB_OUTPUT"
+
+  install-python:
+    name: Install Python (if requested)
+    needs: load
+    if: ${{ fromJSON(needs.load.outputs.infra_config).ensure.python == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Ensure Python on remote
+        run: |
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+            ./.ansible/playbooks/ensure_env.yml \
+            --extra-vars '{"ensure_python": true, "ensure_docker": false}'
+
+  install-docker:
+    name: Install Docker (if requested)
+    needs: [load, install-python]
+    if: ${{ fromJSON(needs.load.outputs.infra_config).ensure.docker == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Ensure Docker on remote
+        run: |
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+            ./.ansible/playbooks/ensure_env.yml \
+            --extra-vars '{"ensure_python": false, "ensure_docker": true}'
+
+  create-directories:
+    name: Create directories (if provided)
+    needs: load
+    if: ${{ fromJSON(needs.load.outputs.infra_config).ensure.directories && fromJSON(needs.load.outputs.infra_config).ensure.directories != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Create directories
+        run: |
+          python - <<'PY'
+            import json
+            j='''${{ toJSON(fromJSON(needs.load.outputs.infra_config).ensure.directories) }}'''
+            open('directories.json','w').write(j)
+            PY
+                    ansible-playbook -i ./.ansible/inventory/hosts.ini \
+                        --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+                        ./.ansible/playbooks/create_directories.yml \
+                        --extra-vars "@directories.json"
+
+  upload-files:
+    name: Upload files (if provided)
+    needs: [load, create-directories]
+    if: ${{ fromJSON(needs.load.outputs.infra_config).ensure.files && fromJSON(needs.load.outputs.infra_config).ensure.files != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Upload files to remote
+        run: |
+         python - <<'PY'
+         import json
+         j='''${{ toJSON(fromJSON(needs.load.outputs.infra_config).ensure.files) }}'''
+            open('files.json','w').write(j)
+            PY
+                    ansible-playbook -i ./.ansible/inventory/hosts.ini \
+                        --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+                        ./.ansible/playbooks/upload_files.yml \
+                        --extra-vars "@files.json"
+
+  ensure-compose:
+    name: Ensure Compose stacks (if compose_setup_path provided)
+    needs: [load, install-docker, upload-files]
+    if: ${{ fromJSON(needs.load.outputs.infra_config).has_compose_setup }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start SSH Agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.ssh-key }}
+      - name: Ensure Compose
+        run: |
+          ansible-playbook -i ./.ansible/inventory/hosts.ini \
+            --limit "${{ fromJSON(needs.load.outputs.infra_config).inventory_host }}" \
+            ./.ansible/playbooks/ensure_compose.yml \
+            --extra-vars "setup_path=${{ fromJSON(needs.load.outputs.infra_config).compose_setup_path }}"
