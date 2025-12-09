@@ -129,3 +129,54 @@ artifacts:
 #### License
 
 MIT (or your preferred permissive license).
+
+
+
+
+---------
+
+1. Which field feels the most exciting to you right now?
+
+DevOps
+
+Observability/Monitoring
+
+SDET/Performance Automation
+
+Hybrid (Observability + Automation)
+
+
+2. What type of day-to-day work do you want?
+
+Running experiments / benchmarks
+Automating pipelines
+Coding Python
+Building SDKs & internal tools
+Less front-end, more backend
+Debugging distributed systems
+
+3. Do you want remote, hybrid, or in-person?
+Remote
+
+
+Working with cloud/AWS
+
+
+
+
+
+
+
+
+🚀 1. Observability Engineer
+.
+
+🚀 2. DevOps / Automation Engineer
+
+
+* Coding Python
+* Automating pipelines
+* Debugging distributed systems
+* Building SDKs & internal tools
+* Running experiments / benchmarks
+* Less front-end, more backend
