@@ -1,23 +1,23 @@
 Great — I see your question, and **you’re absolutely right to pause before updating LinkedIn**.
-Your About section is already **strong**, so before we change anything you should understand *why* and *when* an update is useful.
+Your About section is already **strong**, so before we change anything you should understand _why_ and _when_ an update is useful.
 
 Let’s answer your question first, then we’ll jump into **Interview Prep — Lesson 1**.
 
 ---
 
-# ✅ **1. Do you *need* to update your LinkedIn About?**
+# ✅ **1. Do you _need_ to update your LinkedIn About?**
 
 ### Short answer: **Not urgently — it is already strong.**
 
 Your current About section:
 
-* Shows clear personality
-* Highlights ownership mindset
-* Lists technical achievements
-* Positions you as a DevOps / Automation / API Testing engineer
-* Signals stability, reliability, and team value (extremely important to recruiters)
+- Shows clear personality
+- Highlights ownership mindset
+- Lists technical achievements
+- Positions you as a DevOps / Automation / API Testing engineer
+- Signals stability, reliability, and team value (extremely important to recruiters)
 
-### But — there *are two possible improvements* you might want later:
+### But — there _are two possible improvements_ you might want later:
 
 ### **Improvement A — Make it more targeted to the jobs you want**
 
@@ -29,13 +29,13 @@ This is great, **but broad**.
 
 If we want companies like **Prefect, Astronomer, Pachyderm, Deepgram, DAG-oriented backend teams, API-heavy platforms**, etc. to see you as a strong fit, we can:
 
-* Make your About slightly more *platform-engineering* oriented
-* Emphasize *Python backend + automation pipelines*
-* Add “internal tooling”, “infrastructure reliability”, “workflow orchestration”, etc.
+- Make your About slightly more _platform-engineering_ oriented
+- Emphasize _Python backend + automation pipelines_
+- Add “internal tooling”, “infrastructure reliability”, “workflow orchestration”, etc.
 
 ### **Improvement B — Add a 2–3 line “value summary” at the top**
 
-Recruiters *skim*.
+Recruiters _skim_.
 A sharp hook at the top increases callbacks.
 
 Example:
@@ -56,7 +56,7 @@ You can start applying today **without changing it**.
 
 # ✅ **2. INTERVIEW PREP — LESSON 1**
 
-This is where we begin building the *muscle* you will need to pass DevOps / Python automation / backend interviews.
+This is where we begin building the _muscle_ you will need to pass DevOps / Python automation / backend interviews.
 
 ---
 
@@ -69,7 +69,7 @@ This is where we begin building the *muscle* you will need to pass DevOps / Pyth
 3. **CI/CD & DevOps practical design**
 4. **System design for backend automation**
 
-Today we master **Python fundamentals** — but in a *practical interview-focused way*.
+Today we master **Python fundamentals** — but in a _practical interview-focused way_.
 
 ---
 
@@ -101,7 +101,7 @@ This is actually incorrect — the real result is:
 
 ### **Why?**
 
-Because `lambda` closes over the *variable*, not its *value*.
+Because `lambda` closes over the _variable_, not its _value_.
 By the time they run, `i` is `3`.
 
 ### Interview takeaway:
@@ -156,7 +156,7 @@ Interview-ready answer:
 
 ## **Q5 — AsyncIO vs Multiprocessing**
 
-You answered honestly, which is good — because this concept *confuses many people*.
+You answered honestly, which is good — because this concept _confuses many people_.
 
 Here is the **perfect interview answer**:
 
@@ -185,9 +185,9 @@ This is the level that passes interviews.
 
 You now have:
 
-* Interview-ready explanations
-* The correct mental model for Python fundamentals
-* Polished answers for AsyncIO, multiprocessing, pytest, closures
+- Interview-ready explanations
+- The correct mental model for Python fundamentals
+- Polished answers for AsyncIO, multiprocessing, pytest, closures
 
 ---
 
@@ -209,7 +209,6 @@ And separately —
 If you want, I can also refine your LinkedIn About section into a cleaner “story”.
 Just say **"Update About"** when you’re ready.
 
-
 #### L2
 
 Totally worth investing in.
@@ -218,7 +217,7 @@ For the kind of roles you’re aiming at (Python automation / CI/CD / backend / 
 Let’s do:
 
 1. AsyncIO mental model (interview-grade but short)
-2. Tiny demo you can run *right now* to feel the difference
+2. Tiny demo you can run _right now_ to feel the difference
 3. A real async load generator you can point at `/api/vector/add`
 4. GIL: what it is, when it bites you, and a tiny experiment
 
@@ -226,12 +225,12 @@ Let’s do:
 
 ## 1️⃣ AsyncIO mental model (in 90 seconds)
 
-**Key idea**: asyncio is *cooperative concurrency* in a single OS thread.
+**Key idea**: asyncio is _cooperative concurrency_ in a single OS thread.
 
-* You have **one event loop**.
-* You schedule **Tasks** on it (wrappers around coroutines).
-* A coroutine **yields control** back to the loop whenever it hits `await`.
-* While one task is waiting (I/O, `sleep`, network), the loop can run another task.
+- You have **one event loop**.
+- You schedule **Tasks** on it (wrappers around coroutines).
+- A coroutine **yields control** back to the loop whenever it hits `await`.
+- While one task is waiting (I/O, `sleep`, network), the loop can run another task.
 
 Interview sound-bite:
 
@@ -299,7 +298,7 @@ This is exactly how your async load-generator wins: by overlapping waiting time.
 
 ## 3️⃣ Real async load generator (point this at your FastAPI target)
 
-This is a *minimal but real* version of your Benchmaker load-runner.
+This is a _minimal but real_ version of your Benchmaker load-runner.
 
 Create `async_load_tester.py` in any repo (or inside `benchmaker-lite/benchmark_client` if you like):
 
@@ -452,12 +451,12 @@ python async_load_tester.py \
 
 You’ll get stats very similar to your existing Benchmaker output, but this script is **small enough to explain in an interview**.
 
-If a hiring manager asks: *“How would you load-test this endpoint?”*
+If a hiring manager asks: _“How would you load-test this endpoint?”_
 You can literally walk them through this structure from memory:
 
-* `AsyncClient` + `gather`
-* per-worker loop
-* collect latencies and compute basic percentiles.
+- `AsyncClient` + `gather`
+- per-worker loop
+- collect latencies and compute basic percentiles.
 
 ---
 
@@ -465,9 +464,9 @@ You can literally walk them through this structure from memory:
 
 **Global Interpreter Lock (GIL)** in CPython:
 
-* Only **one Python bytecode** can execute at a time per interpreter.
-* Threads in the same process **don’t run Python code in parallel** on multiple cores.
-* They *can* overlap waiting (I/O), but not CPU work.
+- Only **one Python bytecode** can execute at a time per interpreter.
+- Threads in the same process **don’t run Python code in parallel** on multiple cores.
+- They _can_ overlap waiting (I/O), but not CPU work.
 
 Interview sound-bite:
 
@@ -539,8 +538,8 @@ python gil_demo.py
 
 You’ll probably see:
 
-* `asyncio` roughly the same as sequential (sometimes slower, overhead)
-* `multiprocessing` noticeably faster on a multi-core machine
+- `asyncio` roughly the same as sequential (sometimes slower, overhead)
+- `multiprocessing` noticeably faster on a multi-core machine
 
 **This is the exact story to tell in interviews** when they ask about the GIL or CPU vs I/O bound workloads.
 
@@ -550,9 +549,9 @@ You’ll probably see:
 
 You now have:
 
-* A solid mental model of asyncio
-* A real, interview-worthy load tester you can run and tweak
-* A concrete GIL explanation backed by a tiny demo script
+- A solid mental model of asyncio
+- A real, interview-worthy load tester you can run and tweak
+- A concrete GIL explanation backed by a tiny demo script
 
 ---
 
@@ -566,11 +565,10 @@ C) **Move to CI/CD system-design prep** (how your async tools fit into pipelines
 
 Reply with **A, B, or C** and we’ll keep stacking skills.
 
-
 ---
 
-Absolutely — and yes, it *does* make sense.
-Most engineers (especially mechanical & systems backgrounds) understand far better when they can **see** how “work” is flowing. AsyncIO, threads, and processes are *all* pipelines — just with different rules.
+Absolutely — and yes, it _does_ make sense.
+Most engineers (especially mechanical & systems backgrounds) understand far better when they can **see** how “work” is flowing. AsyncIO, threads, and processes are _all_ pipelines — just with different rules.
 
 Below are **clear visual diagrams** you can keep, print, or drop into your notes.
 
@@ -578,7 +576,7 @@ Below are **clear visual diagrams** you can keep, print, or drop into your notes
 
 # 🌀 **1. AsyncIO Event Loop — Visual Mental Model**
 
-Think of the **event loop** like a **single fast worker** who handles many jobs by *switching tasks when one is waiting*.
+Think of the **event loop** like a **single fast worker** who handles many jobs by _switching tasks when one is waiting_.
 
 ---
 
@@ -590,10 +588,10 @@ Think of the **event loop** like a **single fast worker** who handles many jobs 
 
 ### **Intuition**
 
-* Only **one coroutine runs at a time**.
-* When it hits `await` (I/O or sleep), it *pauses itself*.
-* The event loop picks the next coroutine that’s ready.
-* No preemption — coroutines *cooperate* by yielding.
+- Only **one coroutine runs at a time**.
+- When it hits `await` (I/O or sleep), it _pauses itself_.
+- The event loop picks the next coroutine that’s ready.
+- No preemption — coroutines _cooperate_ by yielding.
 
 ---
 
@@ -631,10 +629,10 @@ Threads try to run tasks **in parallel**, but…
 
 ### **Visual Explanation**
 
-* Multiple threads exist (`T1`, `T2`, `T3`).
-* They share the same memory & interpreter state.
-* But only **one thread executes Python bytecode at a time**.
-* The GIL is like a **mutex lock over the entire interpreter**.
+- Multiple threads exist (`T1`, `T2`, `T3`).
+- They share the same memory & interpreter state.
+- But only **one thread executes Python bytecode at a time**.
+- The GIL is like a **mutex lock over the entire interpreter**.
 
 ---
 
@@ -644,9 +642,9 @@ Threads try to run tasks **in parallel**, but…
 >
 > Worker 1 welds for a moment → hands torch to Worker 2 → Worker 2 welds → hands to Worker 3.
 
-They *look* like they’re parallel, but only **one welds at any given moment**.
+They _look_ like they’re parallel, but only **one welds at any given moment**.
 
-They *can* parallelize waiting operations (like running to get supplies),
+They _can_ parallelize waiting operations (like running to get supplies),
 but not welding (CPU-heavy Python work).
 
 ---
@@ -657,9 +655,9 @@ Processes do not share a GIL.
 
 Each process has:
 
-* its own Python interpreter
-* its own memory
-* and therefore **can actually run on a separate CPU core**.
+- its own Python interpreter
+- its own memory
+- and therefore **can actually run on a separate CPU core**.
 
 ---
 
@@ -671,13 +669,13 @@ Each process has:
 
 ![Image](https://www.cs.wustl.edu/~jain/cse567-11/ftp/multcore/fig1.png?utm_source=chatgpt.com)
 
-![Image](https://researchcomputing.princeton.edu/sites/g/files/toruqf7796/files/styles/freeform_750w/public/2021-11/key.png?itok=ahXhcNdP\&utm_source=chatgpt.com)
+![Image](https://researchcomputing.princeton.edu/sites/g/files/toruqf7796/files/styles/freeform_750w/public/2021-11/key.png?itok=ahXhcNdP&utm_source=chatgpt.com)
 
 ### **Intuition**
 
-* All processes run **truly simultaneously** on separate CPU cores.
-* Perfect for CPU-bound work.
-* Communication requires serialization (pickling).
+- All processes run **truly simultaneously** on separate CPU cores.
+- Perfect for CPU-bound work.
+- Communication requires serialization (pickling).
 
 ---
 
@@ -698,9 +696,9 @@ Here’s one more diagram-style breakdown you can keep:
 
 ## **🟦 AsyncIO (I/O-bound concurrency)**
 
-* **1 worker**, many tasks
-* Tasks voluntarily yield (`await`)
-* Best for: HTTP requests, DB calls, network work, sleep, timers
+- **1 worker**, many tasks
+- Tasks voluntarily yield (`await`)
+- Best for: HTTP requests, DB calls, network work, sleep, timers
 
 ```
 Worker:  A----await----A----await----A
@@ -714,9 +712,9 @@ Tasks:   B----await----B----await----B
 
 ## **🟧 Threads (I/O-bound concurrency, limited CPU parallelism)**
 
-* Multiple workers
-* But **only one runs Python at a time** (GIL)
-* Best for: I/O that uses blocking libraries (e.g., requests, boto3)
+- Multiple workers
+- But **only one runs Python at a time** (GIL)
+- Best for: I/O that uses blocking libraries (e.g., requests, boto3)
 
 ```
 T1:  [ GIL ]----wait----[ GIL ]---wait
@@ -728,9 +726,9 @@ T3:   wait---------------[ GIL ]
 
 ## **🟥 Multiprocessing (true CPU parallel)**
 
-* Multiple workers
-* Each has its own interpreter
-* Best for: CPU-bound tasks (math, ML, parsing, hashing)
+- Multiple workers
+- Each has its own interpreter
+- Best for: CPU-bound tasks (math, ML, parsing, hashing)
 
 ```
 Core1: [Process A working]
@@ -754,7 +752,8 @@ We can now move on to:
 
 👉 **Implementing a visualizer** (ASCII or web UI) that shows tasks switching in real-time
 👉 **Writing interview answers using these diagrams**
-👉 **Deep dive into "await vs yield vs callback"**
+👉 **Deep dive into "a
+wait vs yield vs callback"**
 
 Just tell me what direction you want next:
 **A) More diagrams**
